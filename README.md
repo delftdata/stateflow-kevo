@@ -1,6 +1,6 @@
-<!-- [![Tests](https://github.com/delftdata/stateflow-kevo/actions/workflows/run_tests.yml/badge.svg)](https://github.com/nikosgavalas/kvstore/actions/workflows/run_tests.yml) -->
+[![Tests](https://github.com/delftdata/stateflow-kevo/actions/workflows/run_tests.yml/badge.svg)](https://github.com/delftdata/stateflow-kevo/actions/workflows/run_tests.yml)
 
-## Kevo
+# Kevo
 
 Kevo is a purpose-built key-value store, specifically designed to serve as a state-backend for transactional dataflow systems.
 
