@@ -10,6 +10,8 @@ It supports incremental (efficient) snapshots, rollbacks, and it offers a select
 2. `HybridLog`, based on Microsoft's [FASTER](https://microsoft.github.io/FASTER/docs/td-research-papers/).
 3. `AppendLog`, similar to Riak's [Bitcask](https://riak.com/assets/bitcask-intro.pdf).
 
+It was developed as part of [this](https://github.com/NikosGavalas/tud-thesis) thesis.
+
 #### Requirements
 See [setup.py](./setup.py).
 
