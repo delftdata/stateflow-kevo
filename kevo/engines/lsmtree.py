@@ -32,6 +32,7 @@ class LSMTree(KVStore):
                  max_runs_per_level=3,
                  density_factor=20,
                  memtable_bytes_limit=1_000_000,
+                 use_wal=False,
                  remote: Optional[Remote] = None):
         self.type = 'lsmtree'
         super().__init__(data_dir=data_dir, max_key_len=max_key_len, max_value_len=max_value_len, remote=remote)
@@ -42,20 +43,22 @@ class LSMTree(KVStore):
 
         self.max_runs_per_level = max_runs_per_level
         self.density_factor = density_factor
+        self.use_wal = use_wal
 
         self.memtable = SortedDict()
         self.memtable_bytes_limit = memtable_bytes_limit
         self.memtable_bytes_count = 0
 
-        self.wal_path = self.data_dir / 'wal'
-        if self.wal_path.is_file():
-            with self.wal_path.open('rb') as wal_file:
-                k, v = self._read_kv_pair(wal_file)
-                while k:
-                    # write the value to the memtable directly, no checks for amount of bytes etc.
-                    self.memtable[k] = v
+        if self.use_wal:
+            self.wal_path = self.data_dir / 'wal'
+            if self.wal_path.is_file():
+                with self.wal_path.open('rb') as wal_file:
                     k, v = self._read_kv_pair(wal_file)
-        self.wal_file = self.wal_path.open('ab')
+                    while k:
+                        # write the value to the memtable directly, no checks for amount of bytes etc.
+                        self.memtable[k] = v
+                        k, v = self._read_kv_pair(wal_file)
+            self.wal_file = self.wal_path.open('ab')
 
         self.levels: list[list[Run]] = []
         self.rfds: list[list[FileIO]] = []
@@ -102,7 +105,8 @@ class LSMTree(KVStore):
             self.rfds[level_idx].append((self.data_dir / f'L{level_idx}.{run_idx}.{version}.run').open('rb'))
 
     def close(self):
-        self.wal_file.close()
+        if self.use_wal:
+            self.wal_file.close()
         for rfds in self.rfds:
             for rfd in rfds:
                 rfd.close()
@@ -146,7 +150,7 @@ class LSMTree(KVStore):
             # normally I would allocate a new memtable here so that writes can continue there
             # and then give the flushing of the old memtable to a background thread
             self._flush()
-        else:
+        elif self.use_wal:
             # write to wal
             self._write_kv_pair(self.wal_file, key, value)
 
@@ -271,9 +275,10 @@ class LSMTree(KVStore):
         self.levels[flush_level].append(Run(bloom_filter, fence_pointers, nr_records))
         self.rfds[flush_level].append((self.data_dir / f'L{flush_level}.{n_runs}.{self.global_version}.run').open('rb'))
 
-        # reset WAL
-        self.wal_file.close()
-        self.wal_file = self.wal_path.open('wb')
+        if self.use_wal:
+            # reset WAL
+            self.wal_file.close()
+            self.wal_file = self.wal_path.open('wb')
 
         # trigger merge if exceeding the runs per level
         if len(self.levels[flush_level]) >= self.max_runs_per_level:

@@ -33,7 +33,9 @@ class TestLSMTree(unittest.TestCase, FuzzyTester):
         self.assertEqual(l.get(b'cc'), b'cici345')
         self.assertEqual(l.get(b'\x01\x00'), b'\x01\x01')
         self.assertEqual(l.get(b'\x01'), b'\x02')
-        self.assertEqual(l.get(256, serializer=lambda i, length: i.to_bytes(length=length), serializer_args={'length': 2}), b'\x01\x01')
+        self.assertEqual(
+            l.get(256, serializer=lambda i, length: i.to_bytes(length=length), serializer_args={'length': 2}),
+            b'\x01\x01')
         self.assertEqual(l.get(b'\x01'), b'\x02')
 
         l.close()
@@ -44,7 +46,8 @@ class TestLSMTree(unittest.TestCase, FuzzyTester):
                         n_items=100, n_iter=10_000, seeds=[1], test_recovery=False, test_remote=False)
 
     def test_fuzzy_realistic(self):
-        self.fuzzy_test(LSMTree, args={'data_dir': self.dir.name, 'remote': None}, key_len_range=(1, 10),
+        self.fuzzy_test(LSMTree, args={'data_dir': self.dir.name, 'use_wal': True, 'remote': None},
+                        key_len_range=(1, 10),
                         val_len_range=(0, 13), n_items=100, n_iter=1_000_000, seeds=[1], test_recovery=True,
                         test_remote=False)
 
@@ -56,28 +59,31 @@ class TestLSMTree(unittest.TestCase, FuzzyTester):
 
     def test_fuzzy_recovery(self):
         self.fuzzy_test(LSMTree,
-                        args={'data_dir': self.dir.name, 'memtable_bytes_limit': 100},
+                        args={'data_dir': self.dir.name, 'memtable_bytes_limit': 100, 'use_wal': True},
                         key_len_range=(1, 10), val_len_range=(0, 13), n_items=10_000, n_iter=10_000, seeds=[1],
                         test_recovery=True, test_remote=False)
 
     def test_fuzzy_remote(self):
         self.fuzzy_test(LSMTree,
-                        args={'data_dir': self.dir.name, 'memtable_bytes_limit': 1_000, 'remote': self.remote},
+                        args={'data_dir': self.dir.name, 'memtable_bytes_limit': 1_000, 'use_wal': True,
+                              'remote': self.remote},
                         key_len_range=(1, 10), val_len_range=(0, 13), n_items=10_000, n_iter=100_000, seeds=[1],
                         test_recovery=True, test_remote=True)
 
     def test_fuzzy_snapshot(self):
         self.fuzzy_test_snapshot(LSMTree,
-                        args={'data_dir': self.dir.name, 'memtable_bytes_limit': 1000, 'remote': self.remote},
-                        key_len_range=(1, 10), val_len_range=(0, 13), n_items=10_000, n_iter=10_000, seed=1)
-
-    def test_fuzzy_snapshot_continuous(self):
-        self.fuzzy_test_snapshot_continuous(LSMTree,
                                  args={'data_dir': self.dir.name, 'memtable_bytes_limit': 1000, 'remote': self.remote},
                                  key_len_range=(1, 10), val_len_range=(0, 13), n_items=10_000, n_iter=10_000, seed=1)
 
+    def test_fuzzy_snapshot_continuous(self):
+        self.fuzzy_test_snapshot_continuous(LSMTree,
+                                            args={'data_dir': self.dir.name, 'memtable_bytes_limit': 1000,
+                                                  'remote': self.remote},
+                                            key_len_range=(1, 10), val_len_range=(0, 13), n_items=10_000, n_iter=10_000,
+                                            seed=1)
+
     def test_wal(self):
-        l1 = LSMTree(self.dir.name)
+        l1 = LSMTree(self.dir.name, use_wal=True)
 
         l1.set(b'a', b'1')
         l1.set(b'b', b'2')
@@ -85,7 +91,7 @@ class TestLSMTree(unittest.TestCase, FuzzyTester):
 
         l1.close()
 
-        l2 = LSMTree(self.dir.name)
+        l2 = LSMTree(self.dir.name, use_wal=True)
 
         self.assertEqual(l2.get(b'a'), b'1')
         self.assertEqual(l2.get(b'b'), b'2')
