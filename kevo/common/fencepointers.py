@@ -49,8 +49,5 @@ class FencePointers:
     def __len__(self):
         return self.incr
 
-    def __str__(self) -> str:
-        return self.serialize()
-
     def __sizeof__(self):
         return sum((getsizeof(k) + getsizeof(v) for k, v in self.pointers.items()))
