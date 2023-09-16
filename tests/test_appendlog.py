@@ -41,6 +41,8 @@ class TestAppendLog(unittest.TestCase, FuzzyTester):
         self.assertEqual(l.get(b'to be deleted'), b'')
         self.assertEqual(l.get(256, serializer=lambda i, length: i.to_bytes(length=length), serializer_args={'length': 2}), b'\x01\x01')
         self.assertEqual(l.get(b'\x01'), b'\x02')
+        self.assertTrue(b'd' in l)
+        self.assertTrue(b'not in' not in l)
 
         l.close()
 

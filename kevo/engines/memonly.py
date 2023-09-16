@@ -23,9 +23,9 @@ class MemOnly(KVStore):
         if self.remote:
             self.restore()
         else:
-            self.rebuild_indices()
+            self._rebuild_indices()
 
-    def rebuild_indices(self):
+    def _rebuild_indices(self):
         self.hash_index.clear()
 
         runs_discovered = self.discover_runs()
@@ -48,24 +48,13 @@ class MemOnly(KVStore):
     def __setitem__(self, key, value):
         return self.set(key, value)
 
-    def get(self, key: bytes):
-        assert type(key) is bytes
-        assert 0 < len(key) <= self.max_key_len
+    def _get(self, key):
+        return self.hash_index.get(key, b'')
 
-        ret = KVStore.EMPTY
-        try:
-            ret = self.hash_index[key]
-        except KeyError:
-            pass
-        return ret
-
-    def set(self, key: bytes, value: bytes = KVStore.EMPTY):
-        assert type(key) is bytes and type(value) is bytes
-        assert 0 < len(key) <= self.max_key_len and len(value) <= self.max_value_len
-
+    def _set(self, key, value=KVStore.EMPTY):
         self.hash_index[key] = value
 
-    def flush(self):
+    def _flush(self):
         if len(self.hash_index) == 0:
             return
 
@@ -80,16 +69,16 @@ class MemOnly(KVStore):
         self.global_version += 1
 
     def snapshot(self, id: int):
-        self.flush()
+        self._flush()
         if self.remote:
             runs = discover_run_files(self.data_dir)
             self.remote.push_deltas(runs, id)
 
     def restore(self, version=None):
-        self.flush()
+        self._flush()
         if self.remote:
             self.global_version = self.remote.restore(version=version)
-            self.rebuild_indices()
+            self._rebuild_indices()
 
     def __sizeof__(self):
         return getsizeof(self.hash_index)

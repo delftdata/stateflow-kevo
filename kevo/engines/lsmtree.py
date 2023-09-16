@@ -68,9 +68,9 @@ class LSMTree(KVStore):
             # restore calls rebuild_indices, so this way we avoid rebuilding twice
             self.restore()
         else:
-            self.rebuild_indices()
+            self._rebuild_indices()
 
-    def rebuild_indices(self):
+    def _rebuild_indices(self):
         # TODO set the global version to the max of the discovered ones
         self.levels.clear()
         self.rfds.clear()
@@ -145,12 +145,12 @@ class LSMTree(KVStore):
         if self.memtable_bytes_count > self.memtable_bytes_limit:
             # normally I would allocate a new memtable here so that writes can continue there
             # and then give the flushing of the old memtable to a background thread
-            self.flush()
+            self._flush()
         else:
             # write to wal
             self._write_kv_pair(self.wal_file, key, value)
 
-    def merge(self, level_idx: int):
+    def _merge(self, level_idx: int):
         level = self.levels[level_idx]
         if level_idx + 1 >= len(self.levels):
             self.levels.append([])
@@ -239,9 +239,9 @@ class LSMTree(KVStore):
 
         # cascade the merging recursively
         if len(next_level) >= self.max_runs_per_level:
-            self.merge(level_idx + 1)
+            self._merge(level_idx + 1)
 
-    def flush(self):
+    def _flush(self):
         if len(self.memtable) == 0:
             return
         fence_pointers = FencePointers(self.density_factor)
@@ -277,24 +277,24 @@ class LSMTree(KVStore):
 
         # trigger merge if exceeding the runs per level
         if len(self.levels[flush_level]) >= self.max_runs_per_level:
-            self.merge(flush_level)
+            self._merge(flush_level)
 
     def snapshot(self, id: int):
-        self.flush()
+        self._flush()
         if self.remote:
             runs = discover_run_files(self.data_dir)
             self.remote.push_deltas(runs, id)
 
     def restore(self, version=None):
         # flush first to empty the memtable
-        self.flush()
+        self._flush()
         if self.remote:
             self.global_version = self.remote.restore(version=version)
             # close open file descriptors first
             for rfds in self.rfds:
                 for rfd in rfds:
                     rfd.close()
-            self.rebuild_indices()
+            self._rebuild_indices()
 
     def __sizeof__(self):
         memtable_size = sum((getsizeof(k) + getsizeof(v) for k, v in self.memtable.items()))

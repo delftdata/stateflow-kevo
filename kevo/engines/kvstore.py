@@ -112,3 +112,15 @@ class KVStore:
 
     def close(self):
         raise NotImplementedError('')
+
+    def snapshot(self, id: int):
+        raise NotImplementedError('')
+
+    def restore(self, version=None):
+        raise NotImplementedError('')
+
+    def _rebuild_indices(self):
+        raise NotImplementedError('')
+
+    def __contains__(self, key):
+        return self.get(key) != b''

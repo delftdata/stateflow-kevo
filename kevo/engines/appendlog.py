@@ -41,9 +41,9 @@ class AppendLog(KVStore):
         if self.remote:
             self.restore()
         else:
-            self.rebuild_indices()
+            self._rebuild_indices()
 
-    def rebuild_indices(self):
+    def _rebuild_indices(self):
         self.levels.clear()
         self.rfds.clear()
 
@@ -81,7 +81,7 @@ class AppendLog(KVStore):
         self.rfds[0].append((self.data_dir / f'L{0}.{self.levels[0]}.{self.global_version}.run').open('rb'))
 
     def close(self):
-        self.close_run()
+        self._close_run()
         self.wfd.close()
         for rfds in self.rfds:
             for rfd in rfds:
@@ -117,10 +117,10 @@ class AppendLog(KVStore):
         self.counter += len(key) + len(value)
 
         if self.counter >= self.threshold:
-            self.close_run()
-            self.open_new_files()
+            self._close_run()
+            self._open_new_files()
 
-    def close_run(self):
+    def _close_run(self):
         if self.counter == 0:
             return
 
@@ -134,19 +134,19 @@ class AppendLog(KVStore):
         self.wfd.close()
 
         if self.compaction_enabled:
-            self.compaction(self.levels[flush_level])
+            self._compaction(self.levels[flush_level])
 
         self.levels[flush_level] += 1
         if self.levels[flush_level] >= self.max_runs_per_level:
-            self.merge(flush_level)
+            self._merge(flush_level)
 
-    def open_new_files(self):
+    def _open_new_files(self):
         flush_level = 0
         self.wfd.close()
         self.wfd = (self.data_dir / f'L{flush_level}.{self.levels[flush_level]}.{self.global_version}.run').open('ab')
         self.rfds[flush_level].append((self.data_dir / f'L{flush_level}.{self.levels[flush_level]}.{self.global_version}.run').open('rb'))
 
-    def compaction(self, run):
+    def _compaction(self, run):
         log_path = (self.data_dir / f'L0.{run}.{self.global_version}.run')
         compacted_log_path = log_path.with_suffix('.tmp')
         # NOTE i can copy the index here and keep the old one for as long as the compaction is running to enable reads
@@ -170,7 +170,7 @@ class AppendLog(KVStore):
         # get a new read fd
         self.rfds[0][run] = log_path.open('rb')
 
-    def merge(self, level: int):
+    def _merge(self, level: int):
         next_level = level + 1
         if next_level >= len(self.levels):
             self.levels.append(0)
@@ -212,17 +212,17 @@ class AppendLog(KVStore):
 
         # merge recursively
         if self.levels[next_level] >= self.max_runs_per_level:
-            self.merge(next_level)
+            self._merge(next_level)
 
     def snapshot(self, id: int):
-        self.close_run()
+        self._close_run()
         if self.remote:
             runs = discover_run_files(self.data_dir)
             self.remote.push_deltas(runs, id)
-        self.open_new_files()
+        self._open_new_files()
 
     def restore(self, version=None):
-        self.close_run()
+        self._close_run()
         if self.remote:
             self.global_version = self.remote.restore(version=version)
             if self.wfd is not None:
@@ -230,7 +230,7 @@ class AppendLog(KVStore):
             for rfds in self.rfds:
                 for rfd in rfds:
                     rfd.close()
-            self.rebuild_indices()
+            self._rebuild_indices()
 
     def __sizeof__(self):
         return getsizeof(self.hash_index)

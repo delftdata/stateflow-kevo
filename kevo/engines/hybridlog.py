@@ -63,9 +63,9 @@ class HybridLog(KVStore):
         if self.remote:
             self.restore()
         else:
-            self.rebuild_indices()
+            self._rebuild_indices()
 
-    def rebuild_indices(self):
+    def _rebuild_indices(self):
         self.levels.clear()
         self.rfds.clear()
 
@@ -115,7 +115,7 @@ class HybridLog(KVStore):
         self.memory.set_tail_offset(self.tail_offset)
 
     def close(self):
-        self.flush(self.tail_offset)  # flush everything
+        self._flush(self.tail_offset)  # flush everything
         self.wfd.close()
         for rfds in self.rfds:
             for rfd in rfds:
@@ -144,7 +144,7 @@ class HybridLog(KVStore):
 
     def _set(self, key, value=KVStore.EMPTY):
         if self.memory.is_full():
-            self.flush(self.ro_offset)
+            self._flush(self.ro_offset)
 
         if key in self.hash_index:
             offset = self.hash_index[key]
@@ -161,10 +161,10 @@ class HybridLog(KVStore):
             self.ro_offset += 1
 
         if self.ro_offset - self.head_offset > self.flush_interval:
-            self.flush(self.ro_offset)
-            self.open_new_files()
+            self._flush(self.ro_offset)
+            self._open_new_files()
 
-    def flush(self, offset: int):
+    def _flush(self, offset: int):
         if self.memory.is_empty():
             return
 
@@ -188,13 +188,13 @@ class HybridLog(KVStore):
 
         self.levels[flush_level] += 1
         if self.levels[flush_level] >= self.max_runs_per_level:
-            self.merge(flush_level)
+            self._merge(flush_level)
 
         # open a new file after merging
         # self.wfd = (self.data_dir / f'L{flush_level}.{self.levels[flush_level]}.{self.global_version}.run').open('ab')
         # self.rfds[flush_level].append((self.data_dir / f'L{flush_level}.{self.levels[flush_level]}.{self.global_version}.run').open('rb'))
 
-    def merge(self, level: int):
+    def _merge(self, level: int):
         next_level = level + 1
         if next_level >= len(self.levels):
             self.levels.append(0)
@@ -237,21 +237,21 @@ class HybridLog(KVStore):
 
         # merge recursively
         if self.levels[next_level] >= self.max_runs_per_level:
-            self.merge(next_level)
+            self._merge(next_level)
 
-    def open_new_files(self):
+    def _open_new_files(self):
         flush_level = 0
         self.wfd.close()
         self.wfd = (self.data_dir / f'L{flush_level}.{self.levels[flush_level]}.{self.global_version}.run').open('ab')
         self.rfds[flush_level].append((self.data_dir / f'L{flush_level}.{self.levels[flush_level]}.{self.global_version}.run').open('rb'))
 
     def snapshot(self, id: int):
-        self.flush(self.tail_offset)
+        self._flush(self.tail_offset)
         self.ro_offset = self.tail_offset
         if self.remote:
             runs = discover_run_files(self.data_dir)
             self.remote.push_deltas(runs, id)
-        self.open_new_files()
+        self._open_new_files()
 
     def restore(self, version=None):
         if self.remote:
@@ -262,7 +262,7 @@ class HybridLog(KVStore):
             for rfds in self.rfds:
                 for rfd in rfds:
                     rfd.close()
-            self.rebuild_indices()
+            self._rebuild_indices()
 
     def __sizeof__(self):
         return getsizeof(self.hash_index) + getsizeof(self.la_to_file_offset) + getsizeof(self.memory)
