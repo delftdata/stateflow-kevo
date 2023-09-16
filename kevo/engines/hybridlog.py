@@ -127,10 +127,7 @@ class HybridLog(KVStore):
     def __setitem__(self, key, value):
         return self.set(key, value)
 
-    def get(self, key: bytes):
-        assert type(key) is bytes
-        assert 0 < len(key) <= self.max_key_len
-
+    def _get(self, key):
         if key not in self.hash_index:
             return KVStore.EMPTY
 
@@ -145,10 +142,7 @@ class HybridLog(KVStore):
         _, v = self._read_kv_pair(log_file)
         return v
 
-    def set(self, key: bytes, value: bytes = KVStore.EMPTY):
-        assert type(key) is bytes and type(value) is bytes
-        assert 0 < len(key) <= self.max_key_len and len(value) <= self.max_value_len
-
+    def _set(self, key, value=KVStore.EMPTY):
         if self.memory.is_full():
             self.flush(self.ro_offset)
 

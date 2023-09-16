@@ -78,10 +78,33 @@ class KVStore:
     def __setitem__(self, key, value):
         raise NotImplementedError('')
 
-    def get(self, key: bytes):
+    def get(self, key, serializer=None, serializer_args=None):
+        if serializer is not None:
+            key = serializer(key, **serializer_args)
+
+        if type(key) is not bytes:
+            raise ValueError('expecting bytes for keys')
+        if len(key) == 0 or len(key) > self.max_key_len:
+            raise ValueError('expecting 0 < len(key) <= max_key_length')
+
+        return self._get(key=key)
+
+    def _get(self, key: bytes):
         raise NotImplementedError('')
 
-    def set(self, key: bytes, value: bytes):
+    def set(self, key, value, serializer=None, serializer_args=None):
+        if serializer is not None:
+            key = serializer(key, **serializer_args)
+            value = serializer(value, **serializer_args)
+
+        if type(key) is not bytes or type(value) is not bytes:
+            raise ValueError('expecting bytes for keys and values.')
+        if len(key) == 0 or len(key) > self.max_key_len or len(value) > self.max_value_len:
+            raise ValueError('expecting 0 < len(key) <= max_key_length and len(value) <= max_value_len')
+
+        self._set(key=key, value=value)
+
+    def _set(self, key: bytes, value: bytes):
         raise NotImplementedError('')
 
     def __sizeof__(self):

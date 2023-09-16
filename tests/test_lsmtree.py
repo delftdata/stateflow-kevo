@@ -25,10 +25,16 @@ class TestLSMTree(unittest.TestCase, FuzzyTester):
         l.set(b'asdf', b'12345')
         l.set(b'cc', b'cici345')
         l.set(b'b', b'3')
+        l.set(256, 257, serializer=lambda i, length: i.to_bytes(length=length), serializer_args={'length': 2})
+        l.set(1, 2, serializer=lambda i, length: i.to_bytes(length=length), serializer_args={'length': 1})
 
         self.assertEqual(l.get(b'b'), b'3')
         self.assertEqual(l.get(b'asdf'), b'12345')
         self.assertEqual(l.get(b'cc'), b'cici345')
+        self.assertEqual(l.get(b'\x01\x00'), b'\x01\x01')
+        self.assertEqual(l.get(b'\x01'), b'\x02')
+        self.assertEqual(l.get(256, serializer=lambda i, length: i.to_bytes(length=length), serializer_args={'length': 2}), b'\x01\x01')
+        self.assertEqual(l.get(b'\x01'), b'\x02')
 
         l.close()
 

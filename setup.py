@@ -4,7 +4,7 @@ classifiers = [
 ]
 setuptools.setup(
     name="kevo",
-    version="0.0.1",
+    version="0.1.0",
     author="Nikos Gavalas",
     description="Key-value store with 3 backend engines",
     classifiers=classifiers,

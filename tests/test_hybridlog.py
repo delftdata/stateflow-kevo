@@ -25,12 +25,16 @@ class TestHybridLog(unittest.TestCase, FuzzyTester):
         l.set(b'b', b'\x00\x00\x02\x00')
         l.set(b'd', b'3\x002\x00')
         l.set(b'e', b'55')
+        l.set(256, 257, serializer=lambda i, length: i.to_bytes(length=length), serializer_args={'length': 2})
+        l.set(1, 2, serializer=lambda i, length: i.to_bytes(length=length), serializer_args={'length': 1})
 
         self.assertEqual(l.get(b'asdf'), b'\x00\x01\x00\x00')
         self.assertEqual(l.get(b'b'), b'\x00\x00\x02\x00')
         self.assertEqual(l.get(b'c'), b'')
         self.assertEqual(l.get(b'd'), b'3\x002\x00')
         self.assertEqual(l.get(b'e'), b'55')
+        self.assertEqual(l.get(256, serializer=lambda i, length: i.to_bytes(length=length), serializer_args={'length': 2}), b'\x01\x01')
+        self.assertEqual(l.get(b'\x01'), b'\x02')
 
         l.close()
 

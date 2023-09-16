@@ -93,10 +93,7 @@ class AppendLog(KVStore):
     def __setitem__(self, key, value):
         return self.set(key, value)
 
-    def get(self, key: bytes):
-        assert type(key) is bytes
-        assert 0 < len(key) <= self.max_key_len
-
+    def _get(self, key):
         if key not in self.hash_index:
             return KVStore.EMPTY
 
@@ -108,10 +105,7 @@ class AppendLog(KVStore):
         assert k == key
         return v
 
-    def set(self, key: bytes, value: bytes = KVStore.EMPTY):
-        assert type(key) is bytes and type(value) is bytes
-        assert 0 < len(key) <= self.max_key_len and len(value) <= self.max_value_len
-
+    def _set(self, key, value=KVStore.EMPTY):
         if not value and key in self.hash_index:
             del self.hash_index[key]
             return
