@@ -1,12 +1,5 @@
-'''
-This now is implemented as a sorted dictionary (because I need the bisect_left/right) with base64/json-based ser/der.
-A better implementation would be: two arrays (one for keys one for values) so that I can binary-search on the keys, and binary encoding for ser/der.
-TODO rebuilding from string could be done linearly if the serialization is sorted, right now the sorteddict is being rebuilt from scratch so that should be fixed
-'''
-
 from sys import getsizeof
-import json
-from base64 import b64encode, b64decode
+import struct
 
 from sortedcontainers import SortedDict
 
@@ -17,38 +10,44 @@ class FencePointers:
 
         self.density_factor = density_factor
         self.counter = 0
-
-        if type(from_str) is str:
-            data = json.loads(from_str) 
-            for k, v in data['pointers'].items():
-                self.pointers[b64decode(k)] = v
-            self.density_factor = data['density_factor']
-            self.counter = data['counter']
+        self.incr = 0
 
     def add(self, key: bytes, offset: int):
-        if self.counter % self.density_factor == 0:
+        if self.incr % self.density_factor == 0:
             self.pointers[key] = offset
+            self.counter += 1
 
-        self.counter += 1
-    
+        self.incr += 1
+
     def bisect(self, key: bytes):
         return self.pointers.bisect(key)
     
     def peekitem(self, idx):
         return self.pointers.peekitem(idx)
 
-    def serialize(self):
-        pointers = {}
+    def to_file_as_blob(self, fd, enc_len):
+        fd.write(struct.pack('<QQ', self.density_factor, self.counter))
         for k, v in self.pointers.items():
-            pointers[b64encode(k).decode()] = v
-        return json.dumps({
-            'pointers': pointers,
-            'density_factor': self.density_factor,
-            'counter': self.counter
-        })
+            fd.write(len(k).to_bytes(enc_len, byteorder='little'))
+            fd.write(k)
+            fd.write(v.to_bytes(8, byteorder='little'))
+
+    def _read_kv_pair(self, fd, enc_len):
+        key_len = int.from_bytes(fd.read(enc_len), byteorder='little')
+        key = fd.read(key_len)
+        value = int.from_bytes(fd.read(8), byteorder='little')
+        self.pointers[key] = value
+
+    def from_file_descriptor(self, fd, enc_len):
+        metadata = fd.read(16)
+        self.density_factor, self.counter = struct.unpack('<QQ', metadata)
+        cnt = self.counter
+        while cnt > 0:
+            self._read_kv_pair(fd, enc_len)
+            cnt -= 1
 
     def __len__(self):
-        return self.counter
+        return self.incr
 
     def __str__(self) -> str:
         return self.serialize()

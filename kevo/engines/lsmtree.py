@@ -13,15 +13,6 @@ from kevo.remote import Remote
 Run = namedtuple('Run', ['filter', 'pointers', 'nr_records'])
 
 
-def append_indices(file_descriptor, fence_pointers, bloom_filter, nr_records):
-    pointers_offset = file_descriptor.tell()
-    file_descriptor.write(fence_pointers.serialize().encode())
-    bloom_offset = file_descriptor.tell()
-    file_descriptor.write(bloom_filter.serialize().encode())
-    # pack two 8 byte unsigned ints for the offsets of the pointers and the bloom filter
-    file_descriptor.write(struct.pack('<QQQ', pointers_offset, bloom_offset, nr_records))
-
-
 class LSMTree(KVStore):
     name = 'LSMTree'
 
@@ -74,7 +65,6 @@ class LSMTree(KVStore):
             self._rebuild_indices()
 
     def _rebuild_indices(self):
-        # TODO set the global version to the max of the discovered ones
         self.levels.clear()
         self.rfds.clear()
 
@@ -92,7 +82,8 @@ class LSMTree(KVStore):
                 offsets = run_file.read()
                 pointers_offset, bloom_offset, nr_records = struct.unpack('<QQQ', offsets)
                 run_file.seek(pointers_offset)
-                pointers = FencePointers(from_str=run_file.read(bloom_offset - pointers_offset).decode())
+                pointers = FencePointers()
+                pointers.from_file_descriptor(run_file, self.key_enc_len)
                 run_file.seek(bloom_offset)
                 bloom_filter = BloomFilter(from_str=run_file.read(bloom_end_offset - bloom_offset).decode())
 
@@ -220,7 +211,7 @@ class LSMTree(KVStore):
                             keys[i], values[i] = self._read_kv_pair(fds[i])
                             counters[i] += 1
 
-            append_indices(run_file, fence_pointers, bloom_filter, nr_records)
+            self._append_indices(run_file, fence_pointers, bloom_filter, nr_records)
 
         if level_idx + 1 >= len(self.rfds):
             self.rfds.append([])
@@ -268,7 +259,7 @@ class LSMTree(KVStore):
                 self._write_kv_pair(run_file, k, v)
                 bloom_filter.add(k)
                 nr_records += 1
-            append_indices(run_file, fence_pointers, bloom_filter, nr_records)
+            self._append_indices(run_file, fence_pointers, bloom_filter, nr_records)
 
         self.memtable_bytes_count = 0
 
@@ -300,6 +291,14 @@ class LSMTree(KVStore):
                 for rfd in rfds:
                     rfd.close()
             self._rebuild_indices()
+
+    def _append_indices(self, file_descriptor, fence_pointers, bloom_filter, nr_records):
+        pointers_offset = file_descriptor.tell()
+        fence_pointers.to_file_as_blob(file_descriptor, self.key_enc_len)
+        bloom_offset = file_descriptor.tell()
+        file_descriptor.write(bloom_filter.serialize().encode())
+        # pack two 8 byte unsigned ints for the offsets of the pointers and the bloom filter
+        file_descriptor.write(struct.pack('<QQQ', pointers_offset, bloom_offset, nr_records))
 
     def __sizeof__(self):
         memtable_size = sum((getsizeof(k) + getsizeof(v) for k, v in self.memtable.items()))
